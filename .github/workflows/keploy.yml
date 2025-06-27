@@ -1,0 +1,41 @@
+name: Keploy API Test
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mongo:
+        image: mongo:4.4
+        ports:
+          - 27017:27017
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - run: npm install
+
+      - name: Install Keploy
+        run: |
+          curl -s https://packagecloud.io/install/repositories/keploy/keploy/script.deb.sh | sudo bash
+          sudo apt install keploy
+
+      - name: Run Keploy Record and Test
+        run: |
+          nohup keploy record --proxyport 8080 --command "node index.js" &
+          sleep 10
+          curl -X POST http://localhost:3000/api/task \
+            -H "Content-Type: application/json" \
+            -d '{"title": "test", "description": "ci"}'
+          sleep 2
+          pkill -f "node index.js"
+          sleep 2
+          nohup keploy test --proxyport 8080 --command "node index.js" &
+          sleep 10
